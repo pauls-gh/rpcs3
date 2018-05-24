@@ -3,79 +3,28 @@
 #include "types.h"
 #include "Atomic.h"
 
+
+typedef struct lock {
+	void *Ptr;
+} LOCK, *PLOCK;
+
 // Shared mutex.
 class shared_mutex final
 {
-	enum : s64
-	{
-		c_one = 1ull << 31, // Fixed-point 1.0 value (one writer)
-		c_min = 0x00000001, // Fixed-point 1.0/max_readers value
-		c_sig = 1ull << 62,
-		c_max = c_one
-	};
-
-	atomic_t<s64> m_value{c_one}; // Semaphore-alike counter
-
-	void imp_lock_shared(s64 _old);
-	void imp_unlock_shared(s64 _old);
-	void imp_wait(s64 _old);
-	void imp_lock(s64 _old);
-	void imp_unlock(s64 _old);
-
-	void imp_lock_upgrade();
-	void imp_lock_degrade();
+	LOCK m_lock = { 0 };
 
 public:
 	constexpr shared_mutex() = default;
 
 	bool try_lock_shared();
-
-	void lock_shared()
-	{
-		const s64 value = m_value.load();
-
-		// Fast path: decrement if positive
-		if (UNLIKELY(value < c_min || value > c_one || !m_value.compare_and_swap_test(value, value - c_min)))
-		{
-			imp_lock_shared(value);
-		}
-	}
-
-	void unlock_shared()
-	{
-		// Unconditional increment
-		const s64 value = m_value.fetch_add(c_min);
-
-		if (value < 0 || value > c_one - c_min)
-		{
-			imp_unlock_shared(value);
-		}
-	}
-
+	void lock_shared();
+	void unlock_shared();
 	bool try_lock();
-
-	void lock()
-	{
-		// Try to lock
-		const s64 value = m_value.compare_and_swap(c_one, 0);
-
-		if (value != c_one)
-		{
-			imp_lock(value);
-		}
-	}
-
-	void unlock()
-	{
-		// Unconditional increment
-		const s64 value = m_value.fetch_add(c_one);
-
-		if (value != 0)
-		{
-			imp_unlock(value);
-		}
-	}
-
+	void lock();
+	void unlock();
+	void lock_upgrade();
+	bool is_lockable();
+#if 0
 	bool try_lock_upgrade();
 
 	void lock_upgrade()
@@ -105,6 +54,7 @@ public:
 	{
 		return m_value.load() >= c_min;
 	}
+#endif
 };
 
 // Simplified shared (reader) lock implementation.

@@ -5,6 +5,74 @@
 #include <vector>
 #include <algorithm>
 
+bool shared_mutex::try_lock_shared()
+{
+	return !!TryAcquireSRWLockShared((PSRWLOCK)&m_lock);
+}
+
+void  shared_mutex::lock_shared()
+{
+	AcquireSRWLockShared((PSRWLOCK)&m_lock);
+}
+
+void  shared_mutex::unlock_shared()
+{
+	ReleaseSRWLockShared((PSRWLOCK)&m_lock);
+}
+
+bool  shared_mutex::try_lock()
+{
+	return !!TryAcquireSRWLockExclusive((PSRWLOCK)&m_lock);
+}
+
+void  shared_mutex::lock()
+{
+	AcquireSRWLockExclusive((PSRWLOCK)&m_lock);
+}
+
+void  shared_mutex::unlock()
+{
+	ReleaseSRWLockExclusive((PSRWLOCK)&m_lock);
+}
+
+void  shared_mutex::lock_upgrade()
+{
+	unlock_shared();
+	lock();
+}
+
+bool shared_mutex::is_lockable()
+{
+	return true;
+}
+
+
+safe_reader_lock::safe_reader_lock(shared_mutex& mutex)
+	: m_mutex(mutex)
+	, m_is_owned(false)
+{
+	m_mutex.lock_shared();
+}
+
+safe_reader_lock::~safe_reader_lock()
+{
+	m_mutex.unlock_shared();
+}
+
+safe_writer_lock::safe_writer_lock(shared_mutex& mutex)
+	: m_mutex(mutex)
+	, m_is_owned(false)
+	, m_is_upgraded(false)
+{
+	m_mutex.lock();
+}
+
+safe_writer_lock::~safe_writer_lock()
+{
+	m_mutex.unlock();
+}
+
+#if 0
 // TLS variable for tracking owned mutexes
 thread_local std::vector<shared_mutex*> g_tls_locks;
 
@@ -332,3 +400,4 @@ safe_writer_lock::~safe_writer_lock()
 
 	// TODO: order locks
 }
+#endif
